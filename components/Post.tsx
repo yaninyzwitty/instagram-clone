@@ -1,8 +1,12 @@
+
+
+
+
 import React, { DetailedHTMLProps, FormEvent, MouseEvent, useEffect, useState } from 'react'
 import { BookmarkIcon, ChatBubbleOvalLeftIcon, EllipsisHorizontalIcon, FaceSmileIcon, HeartIcon, PaperAirplaneIcon} from '@heroicons/react/24/outline'
 import { HeartIcon as HeartIconFilled } from '@heroicons/react/24/solid'
 import { useSession } from 'next-auth/react'
-import { addDoc, collection, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc, snapshotEqual } from 'firebase/firestore'
+import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc, snapshotEqual } from 'firebase/firestore'
 import { db } from '../firebase'
 import Moment from "react-moment"
 
@@ -22,6 +26,7 @@ function Post({ id, userName, img, caption, userImg}: Props) {
   const [comment, setComment ] = useState("");
   const [comments, setComments ] = useState([]);
   const [likes, setLikes ] = useState([]);
+  const [hasLiked, setHasLiked ] = useState(false);
   // console.log(comments)
   // console.log(session)
 
@@ -39,11 +44,26 @@ useEffect(() => {
 
 }, [db, id]);
 
+useEffect(() => {
+  setHasLiked(
+    likes.findIndex((like) => like.id === session?.user?.email) !== -1
+  )
+},[likes])
 
-// const likePost = async () => {
-//   await setDoc(doc(db, "posts", id, "likes") {
-//     username: session?.user?.name
-//   })
+
+useEffect(() => onSnapshot(collection(db, "posts", id, "likes"), snapshot => setLikes(snapshot.docs)), [db, id])
+const likePost = async () => {
+  if(hasLiked) {
+    await deleteDoc(doc(db, "posts", id, "likes", session?.user?.email));
+
+  }
+  else {
+
+    await setDoc(doc(db, "posts", id, "likes", session?.user?.email), {
+      username: session?.user?.name,
+    })
+  }
+  }
 
 
 
@@ -94,7 +114,15 @@ useEffect(() => {
 
         <div className='flex justify-between px-4 pt-4'>
         <div className='flex space-x-4'>
-          <HeartIcon  className="btn" />
+          {
+            hasLiked ? (
+              <HeartIconFilled onClick={likePost} className='btn text-red-500'/>
+            ): (
+
+              <HeartIcon onClick={likePost} className="btn" />
+              )
+              
+            }
           <ChatBubbleOvalLeftIcon className='btn' />
           <PaperAirplaneIcon className='btn -rotate-90'/>
         </div>
@@ -104,7 +132,11 @@ useEffect(() => {
         )}
        
         {/* caption */}
-        <p className='p-5 truncate'><span className='font-bold mr-1'>{userName}</span>{caption}</p>
+        <p className='p-5 truncate'>
+          {likes.length > 0 && (
+            <p className='font-bold mb-1'>{likes.length} likes</p>
+          )}
+          <span className='font-bold mr-1'>{userName}</span>{caption}</p>
        
         {/*  comments*/}
         {comments.length > 0 && (
